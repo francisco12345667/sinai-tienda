@@ -106,7 +106,7 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;backgroun
 .form-group label{font-size:13px;color:#5c544a;display:block;margin-bottom:6px;font-weight:600}
 .form-input{width:100%;padding:.8rem;border:1.5px solid #e8e0d5;border-radius:12px;font-size:15px;outline:none;background:#fdfcfb;transition:border-color 0.15s}
 .form-input:focus{border-color:#1a1a2e;background:#fff}
-.btn-primary{width:100%;background:#1a1a2e;border:none;border-radius:14px;padding:.9rem;color:#fff;font-weight:700;font-size:15px;cursor:pointer;margin-top:4px;transition:all 0.15s;text-align:center}
+.btn-primary{width:100%;background:#1a1a2e;border:none;border-radius:14px;padding:.9rem;color:#fff;font-weight:700;font-size:15px;cursor:margin-top:4px;transition:all 0.15s;text-align:center}
 .btn-primary:active{transform:scale(0.98)}
 .btn-danger{background:#c0392b!important;box-shadow:0 4px 10px rgba(192,57,43,0.2)}
 .btn-success{background:#2d8653!important;box-shadow:0 4px 10px rgba(45,134,83,0.2)}
@@ -540,36 +540,8 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;backgroun
 
 <div id="toast" class="toast"></div>
 
-<!-- SCRIPT FIREBASE Y LÓGICA -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-// Tu configuración de Firebase
-let misCredencialesFirebase = {
-  apiKey: "TU_API_KEY_AQUI",
-  authDomain: "tu-proyecto.firebaseapp.com",
-  projectId: "tu-proyecto",
-  storageBucket: "tu-proyecto.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456:web:abcd"
-};
-
-let useCloud = false;
-let fbConfig = null;
-
-if (typeof __firebase_config !== 'undefined') {
-    fbConfig = JSON.parse(__firebase_config);
-    useCloud = true;
-} else if (misCredencialesFirebase.apiKey !== "TU_API_KEY_AQUI") {
-    fbConfig = misCredencialesFirebase;
-    useCloud = true;
-}
-
-let app, auth, db, appId;
-let dbReady = false;
-
+<!-- SCRIPT 100% MEMORIA LOCAL -->
+<script>
 let state = {
   stores: [],
   products: {},
@@ -581,7 +553,7 @@ let state = {
 let salesList = [];
 let cierresList = [];
 let expensesList = []; 
-let pacasList = []; // Módulo Bodega
+let pacasList = []; 
 
 const DEFAULT_STORES=[{id:"T001",name:"Sinaí 1",city:"Chontales"},{id:"T002",name:"Sinaí 2",city:"Chontales"},{id:"T003",name:"Sinaí 3",city:"El Ayote"}];
 
@@ -590,7 +562,6 @@ function initDefaults() {
   state.pins = { ADMIN: "0000", T001: "1111", T002: "2222", T003: "3333" };
   state.appName = "Sinaí Tiendas";
   
-  // Catálogo completo transcrito de las 3 imágenes (Chontales)
   const chontales = [
     ["Ropa variada",10,0,0,"👕"],["Corbatas",20,0,0,"👔"],["Chores niño",50,30,0,"🩳"],["Licras niña",30,0,0,"🩲"],
     ["Pijama juvenil",60,0,0,"👕"],["Fundas almohadas",30,0,0,"🛏"],["Vestidos dama",100,30,0,"👗"],
@@ -612,7 +583,6 @@ function initDefaults() {
     ["Camiseta dama",30,0,0,"👚"],["Licras dama",150,30,0,"🩲"],["Pantalón cargo dama",250,0,0,"👖"]
   ];
 
-  // Catálogo completo de la imagen de El Ayote
   const elAyote = [
     ["Pantalones jeans cab",300,200,0,"👖"],["Pantalones vestir",200,0,0,"👔"],["Pantalones jeans dama",300,100,0,"👖"],
     ["Pantalones cargos dama",200,0,0,"👖"],["Chores cargo cab",200,0,0,"🩳"],["Chores de vestir cab",100,0,0,"🩳"],
@@ -633,58 +603,18 @@ function initDefaults() {
   });
 }
 
-function sanitize(obj) { return JSON.parse(JSON.stringify(obj)); }
-
 const StoreDB = {
-  saveCore: async () => {
-    if (useCloud && dbReady) {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'coreState', 'main'), sanitize({
-        stores: state.stores, products: state.products, pins: state.pins, storePhotos: state.storePhotos, appLogo: state.appLogo, appName: state.appName
-      }));
-    } else {
-      localStorage.setItem("sinai_core", JSON.stringify({stores: state.stores, products: state.products, pins: state.pins, storePhotos: state.storePhotos, appLogo: state.appLogo, appName: state.appName}));
-    }
-  },
-  addSale: async (saleObj) => {
-    if (useCloud && dbReady) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'sales'), sanitize(saleObj));
-    else { saleObj._docId = "L-" + Date.now(); salesList.push(saleObj); localStorage.setItem("sinai_sales", JSON.stringify(salesList)); }
-  },
-  updateSale: async (docId, updatedSale) => {
-    if (useCloud && dbReady) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sales', docId), sanitize(updatedSale));
-    else { const idx = salesList.findIndex(s => s._docId === docId); if(idx > -1) { salesList[idx] = updatedSale; localStorage.setItem("sinai_sales", JSON.stringify(salesList)); } }
-  },
-  deleteSale: async (docId) => {
-    if (useCloud && dbReady) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sales', docId));
-    else { salesList = salesList.filter(s => s._docId !== docId); localStorage.setItem("sinai_sales", JSON.stringify(salesList)); }
-  },
-  addCierre: async (cierreObj) => {
-    if (useCloud && dbReady) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'cierres'), sanitize(cierreObj));
-    else { cierreObj._docId = "L-" + Date.now(); cierresList.push(cierreObj); localStorage.setItem("sinai_cierres", JSON.stringify(cierresList)); }
-  },
-  deleteCierre: async (docId) => {
-    if (useCloud && dbReady) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'cierres', docId));
-    else { cierresList = cierresList.filter(c => c._docId !== docId); localStorage.setItem("sinai_cierres", JSON.stringify(cierresList)); }
-  },
-  addExpense: async (expObj) => {
-    if (useCloud && dbReady) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), sanitize(expObj));
-    else { expObj._docId = "E-" + Date.now(); expensesList.push(expObj); localStorage.setItem("sinai_expenses", JSON.stringify(expensesList)); }
-  },
-  deleteExpense: async (docId) => {
-    if (useCloud && dbReady) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', docId));
-    else { expensesList = expensesList.filter(e => e._docId !== docId); localStorage.setItem("sinai_expenses", JSON.stringify(expensesList)); }
-  },
-  addPaca: async (pacaObj) => {
-    if (useCloud && dbReady) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'pacas'), sanitize(pacaObj));
-    else { pacaObj._docId = "P-" + Date.now(); pacasList.push(pacaObj); localStorage.setItem("sinai_pacas", JSON.stringify(pacasList)); }
-  },
-  updatePaca: async (docId, updatedPaca) => {
-    if (useCloud && dbReady) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'pacas', docId), sanitize(updatedPaca));
-    else { const idx = pacasList.findIndex(p => p._docId === docId); if(idx > -1) { pacasList[idx] = updatedPaca; localStorage.setItem("sinai_pacas", JSON.stringify(pacasList)); } }
-  },
-  deletePaca: async (docId) => {
-    if (useCloud && dbReady) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'pacas', docId));
-    else { pacasList = pacasList.filter(p => p._docId !== docId); localStorage.setItem("sinai_pacas", JSON.stringify(pacasList)); }
-  }
+  saveCore: () => { localStorage.setItem("sinai_core", JSON.stringify(state)); },
+  addSale: (saleObj) => { saleObj._docId = "L-" + Date.now() + Math.random(); salesList.push(saleObj); localStorage.setItem("sinai_sales", JSON.stringify(salesList)); },
+  updateSale: (docId, updatedSale) => { const idx = salesList.findIndex(s => s._docId === docId); if(idx > -1) { salesList[idx] = updatedSale; localStorage.setItem("sinai_sales", JSON.stringify(salesList)); } },
+  deleteSale: (docId) => { salesList = salesList.filter(s => s._docId !== docId); localStorage.setItem("sinai_sales", JSON.stringify(salesList)); },
+  addCierre: (cierreObj) => { cierreObj._docId = "L-" + Date.now() + Math.random(); cierresList.push(cierreObj); localStorage.setItem("sinai_cierres", JSON.stringify(cierresList)); },
+  deleteCierre: (docId) => { cierresList = cierresList.filter(c => c._docId !== docId); localStorage.setItem("sinai_cierres", JSON.stringify(cierresList)); },
+  addExpense: (expObj) => { expObj._docId = "E-" + Date.now() + Math.random(); expensesList.push(expObj); localStorage.setItem("sinai_expenses", JSON.stringify(expensesList)); },
+  deleteExpense: (docId) => { expensesList = expensesList.filter(e => e._docId !== docId); localStorage.setItem("sinai_expenses", JSON.stringify(expensesList)); },
+  addPaca: (pacaObj) => { pacaObj._docId = "P-" + Date.now() + Math.random(); pacasList.push(pacaObj); localStorage.setItem("sinai_pacas", JSON.stringify(pacasList)); },
+  updatePaca: (docId, updatedPaca) => { const idx = pacasList.findIndex(p => p._docId === docId); if(idx > -1) { pacasList[idx] = updatedPaca; localStorage.setItem("sinai_pacas", JSON.stringify(pacasList)); } },
+  deletePaca: (docId) => { pacasList = pacasList.filter(p => p._docId !== docId); localStorage.setItem("sinai_pacas", JSON.stringify(pacasList)); }
 };
 
 function triggerUpdate() {
@@ -707,86 +637,19 @@ function triggerUpdate() {
   }
 }
 
-try {
-  if (useCloud) {
-    app = initializeApp(fbConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (err) {
-        console.error("Error de autenticación:", err);
-      }
-    };
-
-    initAuth().then(() => {
-        onAuthStateChanged(auth, (user) => {
-          if(user) {
-              dbReady = true;
-              document.getElementById("syncStatus").textContent = "☁️ Conectado a la Nube";
-              setTimeout(() => document.getElementById("syncStatus").classList.add("hidden"), 3000);
-              
-              onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'coreState', 'main'), (docSnap) => {
-                  if (docSnap.exists()) {
-                      const data = docSnap.data();
-                      state.stores = data.stores || [];
-                      state.products = data.products || {};
-                      state.pins = data.pins || {ADMIN: "0000"};
-                      state.storePhotos = data.storePhotos || {};
-                      state.appLogo = data.appLogo || null;
-                      state.appName = data.appName || "Sinaí Tiendas";
-                  } else {
-                      initDefaults();
-                      StoreDB.saveCore();
-                  }
-                  triggerUpdate();
-              }, (err) => console.error("Error coreState:", err));
-
-              onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'sales'), (snap) => {
-                  salesList = snap.docs.map(d => ({...d.data(), _docId: d.id})); triggerUpdate();
-              }, (err) => console.error("Error sales:", err));
-
-              onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'cierres'), (snap) => {
-                  cierresList = snap.docs.map(d => ({...d.data(), _docId: d.id})); triggerUpdate();
-              }, (err) => console.error("Error cierres:", err));
-
-              onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), (snap) => {
-                  expensesList = snap.docs.map(d => ({...d.data(), _docId: d.id})); triggerUpdate();
-              }, (err) => console.error("Error expenses:", err));
-
-              onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'pacas'), (snap) => {
-                  pacasList = snap.docs.map(d => ({...d.data(), _docId: d.id})); triggerUpdate();
-              }, (err) => console.error("Error pacas:", err));
-          }
-        });
-    });
-  } else {
-    document.getElementById("syncStatus").textContent = "💾 Modo Memoria Local";
-    setTimeout(() => document.getElementById("syncStatus").classList.add("hidden"), 3000);
-    
-    const core = JSON.parse(localStorage.getItem("sinai_core"));
-    if (core) {
-        state = {...state, ...core};
-    } else {
-        initDefaults();
-        StoreDB.saveCore();
-    }
-    salesList = JSON.parse(localStorage.getItem("sinai_sales")) || [];
-    cierresList = JSON.parse(localStorage.getItem("sinai_cierres")) || [];
-    expensesList = JSON.parse(localStorage.getItem("sinai_expenses")) || [];
-    pacasList = JSON.parse(localStorage.getItem("sinai_pacas")) || [];
-    triggerUpdate();
-  }
-} catch (globalErr) {
-    console.error("Fallo durante la inicialización:", globalErr);
+// INICIALIZACIÓN
+const core = JSON.parse(localStorage.getItem("sinai_core"));
+if (core) {
+    state = {...state, ...core};
+} else {
+    initDefaults();
+    StoreDB.saveCore();
 }
+salesList = JSON.parse(localStorage.getItem("sinai_sales")) || [];
+cierresList = JSON.parse(localStorage.getItem("sinai_cierres")) || [];
+expensesList = JSON.parse(localStorage.getItem("sinai_expenses")) || [];
+pacasList = JSON.parse(localStorage.getItem("sinai_pacas")) || [];
+triggerUpdate();
 
 let currentStore=null,isAdmin=false;
 let cart={}, selectedPrices={};
@@ -894,9 +757,6 @@ function switchPosTab(tab){
   if(tab === 'bodega') renderBodega();
 }
 
-/* =========================================================
-   LA CLAVE DE LA VELOCIDAD: closeModal() VA SIEMPRE PRIMERO
-========================================================= */
 function closeModal(id){ document.getElementById(id).classList.remove("open"); }
 function showToast(msg){
   const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
@@ -935,25 +795,21 @@ function prepararAbrirPaca(docId) {
   document.getElementById("modalConfirmPaca").classList.add("open");
 }
 
-async function ejecutarAbrirPaca() {
+function ejecutarAbrirPaca() {
   if(!pacaToOpen) return;
   const paca = pacasList.find(p => p._docId === pacaToOpen);
   
-  // 1. Cerramos el modal primero para que no haya "congelamiento"
   closeModal("modalConfirmPaca"); 
-  if(useCloud) showToast("☁️ Notificando al administrador...");
 
   if(paca) {
     const now = new Date();
     paca.status = 'abierta';
     paca.fechaAbierta = now.toLocaleDateString("es-NI") + " " + now.toLocaleTimeString("es-NI",{hour:"2-digit",minute:"2-digit"});
-    
-    // 2. Guardamos en la nube (que puede tardar segundos)
-    await StoreDB.updatePaca(pacaToOpen, paca);
+    StoreDB.updatePaca(pacaToOpen, paca);
   }
   
   pacaToOpen = null;
-  if(!useCloud) triggerUpdate(); 
+  triggerUpdate(); 
   showToast("✅ Paca marcada como abierta");
 }
 
@@ -971,27 +827,22 @@ function prepararGasto() {
   document.getElementById("modalConfirmGasto").classList.add("open");
 }
 
-async function ejecutarGasto() {
+function ejecutarGasto() {
   if(!currentStore || !pendingGasto) return;
   
   const now = new Date();
   const date = now.toLocaleDateString("es-NI"), time = now.toLocaleTimeString("es-NI",{hour:"2-digit",minute:"2-digit"});
   const expObj = {
-      id: "G-"+Date.now(), storeId: currentStore.id, storeName: currentStore.name,
+      storeId: currentStore.id, storeName: currentStore.name,
       concepto: pendingGasto.concepto, monto: pendingGasto.monto, date, time, period: currentPeriod(currentStore.id)
   };
   
-  // 1. Cerrar Modal para velocidad visual
   closeModal("modalConfirmGasto");
   document.getElementById("gastoMonto").value = "";
   pendingGasto = null;
   
-  if(useCloud) showToast("☁️ Guardando en la nube...");
-  
-  // 2. Ejecutar guardado
-  await StoreDB.addExpense(expObj);
-  
-  if(!useCloud) triggerUpdate(); 
+  StoreDB.addExpense(expObj);
+  triggerUpdate(); 
   showToast("💸 Gasto restado de la caja");
 }
 
@@ -1127,28 +978,23 @@ function openConfirmSale(){
   document.getElementById("modalConfirmSale").classList.add("open");
 }
 
-async function confirmSale(){
-  // 1. Cerrar advertencia instantáneamente para velocidad
+function confirmSale(){
   closeModal("modalConfirmSale");
   
   const now=new Date();
   const date=now.toLocaleDateString("es-NI"),time=now.toLocaleTimeString("es-NI",{hour:"2-digit",minute:"2-digit"});
   
   let ticketItems = "", cartTotal = 0;
-  const itemsCache = cartArray(); // Guardamos en memoria rápida
+  const itemsCache = cartArray(); 
   
-  // Limpiamos pantalla al instante
   cart={}; selectedPrices={}; renderProducts(); updateCartUI(); 
   
-  if(useCloud) showToast("☁️ Guardando venta en la nube...");
-
-  // 2. Procesamos en la nube (Esto puede tardar segundos)
   for(const item of itemsCache) {
       const lineTotal = (item.selectedPrice||0)*item.qty;
       ticketItems += `<div style="display:flex; justify-content:space-between; font-size:12px;"><span>${item.name} x${item.qty}</span><span>C$${lineTotal}</span></div>`;
       cartTotal += lineTotal;
-      const saleObj = { id:"V-"+Date.now()+"-"+Math.random().toString(36).slice(2,5), storeId:currentStore.id, storeName:currentStore.name, product:item.name, qty:item.qty, price:item.selectedPrice||0, total:lineTotal, date, time, period:currentPeriod(currentStore.id) };
-      await StoreDB.addSale(saleObj);
+      const saleObj = { storeId:currentStore.id, storeName:currentStore.name, product:item.name, qty:item.qty, price:item.selectedPrice||0, total:lineTotal, date, time, period:currentPeriod(currentStore.id) };
+      StoreDB.addSale(saleObj);
       const pReal = (state.products[currentStore.id] || []).find(x => x.id === item.id);
       if(pReal && pReal.stock !== undefined) { pReal.stock = pReal.stock !== undefined ? Math.max(0, pReal.stock - item.qty) : 0; }
   }
@@ -1165,11 +1011,11 @@ async function confirmSale(){
     <div style="text-align:center; font-size:12px; margin-top:15px;">¡Gracias por su compra!</div>
   `;
   
-  await StoreDB.saveCore();
+  StoreDB.saveCore();
   
   const b=document.getElementById("successBanner");
   b.classList.remove("hidden"); setTimeout(()=>b.classList.add("hidden"), 8000); 
-  if(!useCloud) showToast("✅ Venta registrada");
+  showToast("✅ Venta registrada");
 }
 
 function renderStoreHistory(){
@@ -1439,30 +1285,25 @@ function renderAdmin(){
 }
 
 // 📦 LÓGICA PACAS (ADMIN)
-async function crearPaca() {
+function crearPaca() {
   const storeId = document.getElementById("pacaStore").value;
   const nombre = document.getElementById("pacaNombre").value.trim();
   const costo = parseFloat(document.getElementById("pacaCosto").value) || 0;
   if(!nombre) return showToast("Escribe el nombre de la paca");
 
-  // 1. Cierra al instante
   closeModal("modalAddPaca");
-  
-  if(useCloud) showToast("☁️ Asignando paca a tienda...");
 
   const now = new Date();
   const pacaObj = {
-      id: "PACA-"+Date.now()+"-"+Math.random().toString(36).slice(2,5),
       storeId, nombre, costo, status: 'asignada',
       fechaAsignada: now.toLocaleDateString("es-NI") + " " + now.toLocaleTimeString("es-NI",{hour:"2-digit",minute:"2-digit"})
   };
   
-  // 2. Procesa en la nube
-  await StoreDB.addPaca(pacaObj);
+  StoreDB.addPaca(pacaObj);
   document.getElementById("pacaNombre").value = "";
   document.getElementById("pacaCosto").value = "";
   
-  if(!useCloud) triggerUpdate(); 
+  triggerUpdate(); 
   showToast("📦 Paca asignada a tienda");
 }
 
@@ -1471,23 +1312,19 @@ function askDeletePaca(id) {
   document.getElementById("modalDeletePaca").classList.add("open");
 }
 
-async function confirmDeletePaca() {
+function confirmDeletePaca() {
   if(!pacaToDelete) return;
-  // 1. Cierra al instante
   closeModal("modalDeletePaca");
   
-  if(useCloud) showToast("☁️ Eliminando paca...");
-  
-  // 2. Procesa en la nube
-  await StoreDB.deletePaca(pacaToDelete);
+  StoreDB.deletePaca(pacaToDelete);
   pacaToDelete = null;
   
-  if(!useCloud) triggerUpdate(); 
+  triggerUpdate(); 
   showToast("🗑 Paca eliminada del registro");
 }
 
 // EDICIONES VARIAS (CERRANDO MODALES PRIMERO)
-async function updateAppName(val) { state.appName = val.trim() || 'Sinaí Tiendas'; await StoreDB.saveCore(); if(!useCloud) triggerUpdate(); showToast("✅ Nombre de la App actualizado"); }
+function updateAppName(val) { state.appName = val.trim() || 'Sinaí Tiendas'; StoreDB.saveCore(); triggerUpdate(); showToast("✅ Nombre de la App actualizado"); }
 
 function openEditStore(id) {
   const store = state.stores.find(s => s.id === id); if(!store) return; editingStoreId = id;
@@ -1495,12 +1332,12 @@ function openEditStore(id) {
   document.getElementById('modalEditStore').classList.add('open');
 }
 
-async function saveEditStore() {
+function saveEditStore() {
   if(!editingStoreId) return;
   const store = state.stores.find(s => s.id === editingStoreId); if(!store) return;
   store.name = document.getElementById('editStoreNameInput').value || store.name; store.city = document.getElementById('editStoreCityInput').value || store.city;
-  closeModal('modalEditStore'); if(useCloud) showToast("☁️ Guardando tienda...");
-  await StoreDB.saveCore(); editingStoreId = null; if(!useCloud) triggerUpdate(); showToast("✅ Sucursal actualizada");
+  closeModal('modalEditStore');
+  StoreDB.saveCore(); editingStoreId = null; triggerUpdate(); showToast("✅ Sucursal actualizada");
 }
 
 function openEditSale(docId) {
@@ -1509,7 +1346,7 @@ function openEditSale(docId) {
   document.getElementById("modalEditSale").classList.add("open");
 }
 
-async function saveEditSale() {
+function saveEditSale() {
   const sale = salesList.find(s => s._docId === editingSaleId); if(!sale) return;
   const newQty = parseInt(document.getElementById("editSaleQty").value), newPrice = parseFloat(document.getElementById("editSalePrice").value);
   if(isNaN(newQty) || isNaN(newPrice) || newQty < 1 || newPrice < 0) return showToast("Valores inválidos");
@@ -1519,19 +1356,19 @@ async function saveEditSale() {
     if(pReal && pReal.stock !== undefined) pReal.stock = pReal.stock !== undefined ? Math.max(0, pReal.stock - diffQty) : 0;
   }
   sale.qty = newQty; sale.price = newPrice; sale.total = newQty * newPrice;
-  closeModal("modalEditSale"); if(useCloud) showToast("☁️ Corrigiendo venta...");
-  await StoreDB.updateSale(editingSaleId, sale); await StoreDB.saveCore(); editingSaleId = null; if(!useCloud) triggerUpdate(); showToast("✅ Venta corregida");
+  closeModal("modalEditSale");
+  StoreDB.updateSale(editingSaleId, sale); StoreDB.saveCore(); editingSaleId = null; triggerUpdate(); showToast("✅ Venta corregida");
 }
 
-async function deleteSale() {
+function deleteSale() {
   if(!editingSaleId) return;
   const sale = salesList.find(s => s._docId === editingSaleId);
   if(sale && state.products[sale.storeId]) {
     const pReal = state.products[sale.storeId].find(x => x.name === sale.product);
     if(pReal && pReal.stock !== undefined) pReal.stock += sale.qty;
   }
-  closeModal("modalEditSale"); if(useCloud) showToast("☁️ Eliminando venta...");
-  await StoreDB.deleteSale(editingSaleId); await StoreDB.saveCore(); editingSaleId = null; if(!useCloud) triggerUpdate(); showToast("🗑 Venta eliminada");
+  closeModal("modalEditSale");
+  StoreDB.deleteSale(editingSaleId); StoreDB.saveCore(); editingSaleId = null; triggerUpdate(); showToast("🗑 Venta eliminada");
 }
 
 function confirmAddStore() {
@@ -1539,24 +1376,24 @@ function confirmAddStore() {
   if(!name) return showToast("Escribe el nombre de la sucursal");
   const id = "T" + Date.now().toString().slice(-4);
   state.stores.push({ id, name, city }); state.pins[id] = pin.slice(0,6); state.products[id] = [];
-  closeModal("modalAddStore"); if(useCloud) showToast("☁️ Creando sucursal...");
-  StoreDB.saveCore(); if(!useCloud) triggerUpdate();
+  closeModal("modalAddStore");
+  StoreDB.saveCore(); triggerUpdate();
   document.getElementById("addStoreName").value = ""; document.getElementById("addStoreCity").value = ""; document.getElementById("addStorePin").value = ""; showToast("✅ Tienda agregada");
 }
 
 function askDeleteStore(id) { storeToDelete = id; document.getElementById("deleteStorePin").value = ""; document.getElementById("modalDeleteStore").classList.add("open"); }
 
-async function confirmDeleteStore() {
+function confirmDeleteStore() {
   if(!storeToDelete) return;
   const pinInput = document.getElementById("deleteStorePin").value;
   if (pinInput !== state.pins["ADMIN"]) return showToast("❌ PIN de Administrador incorrecto");
   
-  closeModal("modalDeleteStore"); if(useCloud) showToast("☁️ Borrando sucursal...");
+  closeModal("modalDeleteStore");
   
   state.stores = state.stores.filter(s => s.id !== storeToDelete); delete state.products[storeToDelete]; delete state.pins[storeToDelete];
-  await StoreDB.saveCore();
-  const ss = salesList.filter(s => s.storeId === storeToDelete); for(const s of ss) await StoreDB.deleteSale(s._docId);
-  storeToDelete = null; if(!useCloud) triggerUpdate(); showToast("🗑 Sucursal eliminada");
+  StoreDB.saveCore();
+  const ss = salesList.filter(s => s.storeId === storeToDelete); for(const s of ss) StoreDB.deleteSale(s._docId);
+  storeToDelete = null; triggerUpdate(); showToast("🗑 Sucursal eliminada");
 }
 
 function openEditProd(storeId,prodId){
@@ -1566,26 +1403,26 @@ function openEditProd(storeId,prodId){
   document.getElementById("editProdStock").value=p.stock||0; document.getElementById("modalEditProd").classList.add("open");
 }
 
-async function saveEditProd(){
+function saveEditProd(){
   const p=(state.products[editingProdStore]||[]).find(x=>x.id===editingProdId); if(!p)return;
   p.name=document.getElementById("editProdName").value||p.name; p.price1=parseFloat(document.getElementById("editPrice1").value)||0; p.price2=parseFloat(document.getElementById("editPrice2").value)||0; p.price3=parseFloat(document.getElementById("editPrice3").value)||0; p.stock=parseInt(document.getElementById("editProdStock").value)||0;
-  closeModal("modalEditProd"); if(useCloud) showToast("☁️ Guardando producto...");
-  await StoreDB.saveCore(); if(!useCloud) triggerUpdate(); showToast("✅ Producto guardado");
+  closeModal("modalEditProd");
+  StoreDB.saveCore(); triggerUpdate(); showToast("✅ Producto guardado");
 }
 
-async function addProduct(){
+function addProduct(){
   const storeId=document.getElementById("addProdStore").value, name=document.getElementById("addProdName").value.trim();
   if(!name)return showToast("Escribe el nombre del producto");
   const p1=parseFloat(document.getElementById("addPrice1").value)||0, p2=parseFloat(document.getElementById("addPrice2").value)||0, p3=parseFloat(document.getElementById("addPrice3").value)||0, stock=parseInt(document.getElementById("addProdStock").value)||10;
   
-  closeModal("modalAddProd"); if(useCloud) showToast("☁️ Agregando producto...");
+  closeModal("modalAddProd");
   
   const targets=storeId==="ALL"?state.stores.map(s=>s.id):[storeId];
   targets.forEach(sid=>{
     if(!state.products[sid])state.products[sid]=[];
     state.products[sid].push({ id:sid+"-P"+String(state.products[sid].length+1).padStart(3,"0")+"-"+Date.now().toString(36), storeId:sid,name,icon:"📦",price1:p1,price2:p2,price3:p3,stock,photo:null });
   });
-  await StoreDB.saveCore(); if(!useCloud) triggerUpdate(); showToast("✅ Producto agregado");
+  StoreDB.saveCore(); triggerUpdate(); showToast("✅ Producto agregado");
 }
 
 function prepCierre(sid){
@@ -1596,36 +1433,34 @@ function prepCierre(sid){
   document.getElementById("modalCierre").classList.add("open");
 }
 
-async function executarCierre(){
+function executarCierre(){
   if(!cierreStore)return;
   const sid=cierreStore, ss=salesList.filter(s=>s.storeId===sid), ee=expensesList.filter(e=>e.storeId===sid);
   const totalVentas=ss.reduce((a,b)=>a+(b.total||0),0), totalGastos=ee.reduce((a,b)=>a+(b.monto||0),0), netoCaja = totalVentas - totalGastos;
   const today=new Date().toLocaleDateString("es-NI"), nota=document.getElementById("cierreNota").value||"";
-  const cierreObj = { id:"C-"+Date.now(), storeId:sid, storeName:state.stores.find(s=>s.id===sid)?.name||sid, period:currentPeriod(sid), nota, fechaCierre:today, totalVentas, totalGastos, netoCaja, numVentas:ss.length };
+  const cierreObj = { storeId:sid, storeName:state.stores.find(s=>s.id===sid)?.name||sid, period:currentPeriod(sid), nota, fechaCierre:today, totalVentas, totalGastos, netoCaja, numVentas:ss.length };
   
-  // 1. CIERRA AL INSTANTE
   closeModal("modalCierre");
   cierreStore=null;
-  if(useCloud) showToast("☁️ Cerrando inventario...");
 
-  await StoreDB.addCierre(cierreObj);
-  for(const s of ss) await StoreDB.deleteSale(s._docId);
-  for(const e of ee) await StoreDB.deleteExpense(e._docId);
+  StoreDB.addCierre(cierreObj);
+  for(const s of ss) StoreDB.deleteSale(s._docId);
+  for(const e of ee) StoreDB.deleteExpense(e._docId);
   
-  if(!useCloud) triggerUpdate(); showToast("🔒 Inventario cerrado exitosamente");
+  triggerUpdate(); showToast("🔒 Inventario cerrado exitosamente");
 }
 
 function askDeleteCierre(id){ deleteCierreId=id; document.getElementById("modalDeleteCierre").classList.add("open"); }
-async function confirmDeleteCierre(){
+function confirmDeleteCierre(){
   if(!deleteCierreId)return;
-  closeModal("modalDeleteCierre"); if(useCloud) showToast("☁️ Eliminando reporte...");
-  await StoreDB.deleteCierre(deleteCierreId); deleteCierreId=null;
-  if(!useCloud) triggerUpdate(); showToast("🗑 Reporte eliminado");
+  closeModal("modalDeleteCierre");
+  StoreDB.deleteCierre(deleteCierreId); deleteCierreId=null;
+  triggerUpdate(); showToast("🗑 Reporte eliminado");
 }
 
-async function updatePin(sid,val){
+function updatePin(sid,val){
   const max=sid==="ADMIN"?8:6; const trimmed=String(val).slice(0,max);
-  if(trimmed.length>=1){ state.pins[sid]=trimmed; await StoreDB.saveCore(); showToast("✅ PIN actualizado"); }
+  if(trimmed.length>=1){ state.pins[sid]=trimmed; StoreDB.saveCore(); showToast("✅ PIN actualizado"); }
 }
 
 let fileMode=null, fileTarget=null;
@@ -1634,30 +1469,22 @@ function handleFile(e) {
   const file = e.target.files[0]; if(!file) return; const reader = new FileReader();
   reader.onload = ev => {
     const dataUrl = ev.target.result; const img = new Image();
-    img.onload = async () => {
+    img.onload = () => {
       const canvas = document.createElement('canvas'); let w = img.width, h = img.height; const MAX_SIZE = 400; 
       if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } } else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
       canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
       const compressedData = canvas.toDataURL('image/jpeg', 0.6); 
-      if (fileMode === "product" && currentStore) { const p = (state.products[currentStore.id] || []).find(x => x.id === fileTarget); if (p) { p.photo = compressedData; await StoreDB.saveCore(); if(!useCloud) triggerUpdate(); } } 
-      else if (fileMode === "product_admin") { const [sid, pid] = fileTarget.split("|||"); const p = (state.products[sid] || []).find(x => x.id === pid); if (p) { p.photo = compressedData; await StoreDB.saveCore(); if(!useCloud) triggerUpdate(); } } 
-      else if (fileMode === "store") { state.storePhotos[fileTarget] = compressedData; await StoreDB.saveCore(); if(!useCloud) triggerUpdate(); } 
-      else if (fileMode === "logo") { state.appLogo = compressedData; await StoreDB.saveCore(); if(!useCloud) triggerUpdate(); }
-      fileMode = null; fileTarget = null; showToast("📸 Imagen guardada en la nube");
+      if (fileMode === "product" && currentStore) { const p = (state.products[currentStore.id] || []).find(x => x.id === fileTarget); if (p) { p.photo = compressedData; StoreDB.saveCore(); triggerUpdate(); } } 
+      else if (fileMode === "product_admin") { const [sid, pid] = fileTarget.split("|||"); const p = (state.products[sid] || []).find(x => x.id === pid); if (p) { p.photo = compressedData; StoreDB.saveCore(); triggerUpdate(); } } 
+      else if (fileMode === "store") { state.storePhotos[fileTarget] = compressedData; StoreDB.saveCore(); triggerUpdate(); } 
+      else if (fileMode === "logo") { state.appLogo = compressedData; StoreDB.saveCore(); triggerUpdate(); }
+      fileMode = null; fileTarget = null; showToast("📸 Imagen guardada");
     };
     img.src = dataUrl;
   };
   reader.readAsDataURL(file); e.target.value = "";
 }
 
-// Se hace el attach a window globalmente con todos los métodos disponibles.
-Object.assign(window, {
-  showLogin, goToPin, pp, pd, switchPosTab, filterProducts, selectPrice, addToCart, removeFromCart, addCartEntry, 
-  openConfirmSale, confirmSale, enterAdmin, switchTab, toggleAccordion, exportSalesToCSV, openEditSale, saveEditSale, 
-  deleteSale, confirmAddStore, askDeleteStore, confirmDeleteStore, openEditStore, saveEditStore, openEditProd, saveEditProd, addProduct, prepCierre, 
-  executarCierre, askDeleteCierre, confirmDeleteCierre, updatePin, updateAppName, closeModal, triggerFile, handleFile,
-  prepararGasto, ejecutarGasto, printLastTicket, printHistoryTicket, prepararAbrirPaca, ejecutarAbrirPaca, crearPaca, askDeletePaca, confirmDeletePaca
-});
 </script>
 </body>
 </html>
